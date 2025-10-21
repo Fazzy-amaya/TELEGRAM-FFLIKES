@@ -1,3 +1,5 @@
-flask
-aiogram==3.4.1
+Flask
 aiohttp
+aiogram==3.3.0
+requests
+gunicorn
