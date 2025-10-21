@@ -1,31 +1,41 @@
 import asyncio
+import aiohttp
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.filters import Command
 from aiogram.client.default import DefaultBotProperties
 from datetime import datetime, timedelta
-import aiohttp
+from flask import Flask
 
-API_TOKEN = "8362880057:AAHVIYUlkx-itBx3KKXGzyJWdU6LOXv8cYE"
-ALLOWED_GROUP_ID = -1002902333162
-VIP_USER_ID = 8362880057
+# === Telegram Bot Setup ===
+API_TOKEN = "8321209822:AAFQZ_tzIW2jJe2eUDkpuz-JIUjXAr4mZLc"
+ALLOWED_GROUP_ID = -100290233316
+VIP_USER_ID = 7431583417
 
 bot = Bot(API_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 
+# === Flask app for Render (keeps service alive) ===
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "✅ Telegram Bot is running on Render!"
+
+# === Bot Logic ===
 user_usage = {}
 like_usage = {"BD": 0, "IND": 0}
 
 def join_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📢 Join Channel", url="https://t.me/jexarofficial")],
+        [InlineKeyboardButton(text="📢 Join Channel", url="https://t.me/FAZZYAMAYA")],
     ])
 
 def vip_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📢 Join Channel", url="https://t.me/jexarofficial")],
-        [InlineKeyboardButton(text="💎 Buy VIP", url="https://t.me/GODJEXAR")],
+        [InlineKeyboardButton(text="📢 Join Channel", url="https://t.me/FAZZYAMAYA")],
+        [InlineKeyboardButton(text="💎 Buy VIP", url="https://t.me/FAZZYAMAYA")],
     ])
 
 def verify_keyboard():
@@ -88,7 +98,7 @@ async def like_handler(msg: Message):
         return
 
     wait = await msg.reply("⏳ Sending Likes, Please Wait.....")
-    url = f"https://anish-likes.vercel.app/like?server_name={region.lower()}&uid={uid}&key=jex4rrr"
+    url = f"https://fazzyamaya.onrender.com/like/like?server_name={region.lower()}&uid={uid}&key=DANGERxGAMER"
     data = await fetch_json(url)
 
     if not data:
@@ -99,31 +109,4 @@ async def like_handler(msg: Message):
         await wait.edit_text(
             f"🚫 Max Likes Reached for Today\n\n"
             f"👤 Name: {data.get('PlayerNickname', 'N/A')}\n"
-            f"🆔 UID: {uid}\n"
-            f"🌍 Region: {region}\n"
-            f"❤️ Current Likes: {data.get('LikesNow', 'N/A')}",
-            reply_markup=vip_keyboard()
-        )
-        return
-
-    await wait.edit_text(
-        f"✅ Likes Sent Successfully!\n\n"
-        f"👤 Name: {data.get('PlayerNickname', 'N/A')}\n"
-        f"🆔 UID: {uid}\n"
-        f"❤️ Before Likes: {data.get('LikesbeforeCommand', 'N/A')}\n"
-        f"👍 Current Likes: {data.get('LikesafterCommand', 'N/A')}\n"
-        f"🎯 Likes Sent By JEX AI: {data.get('LikesGivenByAPI', 'N/A')}",
-        reply_markup=join_keyboard()
-    )
-
-    if user_id != VIP_USER_ID:
-        user_usage.setdefault(user_id, {})["like"] = 1
-        like_usage[region] += 1
-
-async def main():
-    print("🤖 Jex AI Like Bot is running...")
-    asyncio.create_task(daily_reset_scheduler())
-    await dp.start_polling(bot)
-
-if __name__ == "__main__":
-    asyncio.run(main())
+            f"🆔 UID
