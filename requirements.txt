@@ -1,5 +1,5 @@
-Flask
-aiohttp
-aiogram==3.3.0
-requests
-gunicorn
+Flask==3.0.3
+aiohttp==3.9.5
+aiogram==3.2.0
+requests==2.32.3
+gunicorn==21.2.0
