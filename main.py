@@ -7,10 +7,10 @@ from aiogram.filters import Command
 from aiogram.client.default import DefaultBotProperties
 from datetime import datetime, timedelta
 from flask import Flask
-import threading
+from threading import Thread
 
 # === Telegram Bot Setup ===
-API_TOKEN = "8321209822:AAFQZ_tzIW2jJe2eUDkpuz-JIUjXAr4mZLc"
+API_TOKEN = "YOUR_BOT_TOKEN_HERE"
 ALLOWED_GROUP_ID = -100290233316
 VIP_USER_ID = 7431583417
 
@@ -134,16 +134,12 @@ async def like_handler(msg: Message):
         user_usage.setdefault(user_id, {})["like"] = 1
         like_usage[region] += 1
 
-async def run_bot():
-    print("🤖 Fuzzy Amaya Like Bot is running...")
+# === Async Run (bot + web) ===
+async def main():
     asyncio.create_task(daily_reset_scheduler())
-    await dp.start_polling(bot)
-
-def start_bot_in_thread():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(run_bot())
+    asyncio.create_task(dp.start_polling(bot))
+    # Keep Flask running (in a thread)
+    Thread(target=lambda: app.run(host="0.0.0.0", port=10000)).start()
 
 if __name__ == "__main__":
-    threading.Thread(target=start_bot_in_thread, daemon=True).start()
-    app.run(host="0.0.0.0", port=10000)
+    asyncio.run(main())
