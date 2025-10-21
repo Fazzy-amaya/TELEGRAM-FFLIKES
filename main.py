@@ -1,6 +1,5 @@
 import asyncio
 import aiohttp
-import threading
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
@@ -8,6 +7,7 @@ from aiogram.filters import Command
 from aiogram.client.default import DefaultBotProperties
 from datetime import datetime, timedelta
 from flask import Flask
+import threading
 
 # === Telegram Bot Setup ===
 API_TOKEN = "8321209822:AAFQZ_tzIW2jJe2eUDkpuz-JIUjXAr4mZLc"
@@ -17,12 +17,13 @@ VIP_USER_ID = 7431583417
 bot = Bot(API_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 
-# === Flask app (Render keeps it alive) ===
+# === Flask app for Render (keeps service alive) ===
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "✅ Telegram Bot is running successfully on Render!"
+    print("✅ Health check received")
+    return "✅ Telegram Bot is running on Render!"
 
 # === Bot Logic ===
 user_usage = {}
@@ -65,20 +66,22 @@ async def fetch_json(url):
                 return await r.json()
     return None
 
-def group_only(func):
-    async def wrapper(msg: Message):
-        if msg.chat.id != ALLOWED_GROUP_ID:
-            return
-        return await func(msg)
-    return wrapper
+@dp.message(Command("start"))
+async def start_handler(msg: Message):
+    await msg.reply(
+        "👋 Welcome to the Fuzzy Amaya Like Bot!\n\n"
+        "Use /like <region> <uid> to send likes.\n"
+        "Example:\n/like bd 123456789",
+        reply_markup=join_keyboard()
+    )
 
 @dp.message(Command("like"))
-@group_only
 async def like_handler(msg: Message):
     parts = msg.text.split()
     if len(parts) != 3:
         await msg.reply("❗ Correct format: /like bd uid", reply_markup=join_keyboard())
         return
+
     region, uid = parts[1].upper(), parts[2]
     if region not in ["BD", "IND"]:
         await msg.reply("❗ Only BD or IND regions are supported!", reply_markup=join_keyboard())
@@ -110,35 +113,37 @@ async def like_handler(msg: Message):
         await wait.edit_text(
             f"🚫 Max Likes Reached for Today\n\n"
             f"👤 Name: {data.get('PlayerNickname', 'N/A')}\n"
-            f"🆔 UID: {uid}", reply_markup=join_keyboard()
+            f"🆔 UID: {uid}\n"
+            f"🌍 Region: {region}\n"
+            f"❤️ Current Likes: {data.get('LikesNow', 'N/A')}",
+            reply_markup=vip_keyboard()
         )
         return
 
     await wait.edit_text(
-        f"✅ Successfully Sent Likes!\n\n"
+        f"✅ Likes Sent Successfully!\n\n"
         f"👤 Name: {data.get('PlayerNickname', 'N/A')}\n"
         f"🆔 UID: {uid}\n"
-        f"🌍 Region: {region}", reply_markup=vip_keyboard()
+        f"❤️ Before Likes: {data.get('LikesbeforeCommand', 'N/A')}\n"
+        f"👍 Current Likes: {data.get('LikesafterCommand', 'N/A')}\n"
+        f"🎯 Likes Sent By JEX AI: {data.get('LikesGivenByAPI', 'N/A')}",
+        reply_markup=join_keyboard()
     )
 
-    user_usage.setdefault(user_id, {})["like"] = user_usage.get(user_id, {}).get("like", 0) + 1
-    like_usage[region] += 1
+    if user_id != VIP_USER_ID:
+        user_usage.setdefault(user_id, {})["like"] = 1
+        like_usage[region] += 1
 
-
-# === Async Bot Runner ===
 async def run_bot():
+    print("🤖 Fuzzy Amaya Like Bot is running...")
     asyncio.create_task(daily_reset_scheduler())
-    print("🚀 Telegram bot started successfully!")
     await dp.start_polling(bot)
 
-
-# === Thread wrapper for bot (so Flask stays alive) ===
-def start_bot_thread():
+def start_bot_in_thread():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(run_bot())
 
-
 if __name__ == "__main__":
-    threading.Thread(target=start_bot_thread, daemon=True).start()
+    threading.Thread(target=start_bot_in_thread, daemon=True).start()
     app.run(host="0.0.0.0", port=10000)
