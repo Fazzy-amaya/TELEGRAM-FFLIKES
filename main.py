@@ -7,11 +7,11 @@ from aiogram.filters import Command
 from aiogram.client.default import DefaultBotProperties
 from datetime import datetime, timedelta
 from flask import Flask
-from threading import Thread
+import threading
 
 # === Telegram Bot Setup ===
-API_TOKEN = "8321209822:AAG3ryvGXpWXMYemRnn6o8yifwTXXDcFjns"
-ALLOWED_GROUP_ID = -1002902333162
+API_TOKEN = "8321209822:AAFQZ_tzIW2jJe2eUDkpuz-JIUjXAr4mZLc"
+ALLOWED_GROUP_ID = -100290233316
 VIP_USER_ID = 7431583417
 
 bot = Bot(API_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
@@ -23,7 +23,7 @@ app = Flask(__name__)
 @app.route('/')
 def home():
     print("✅ Health check received")
-    return "✅ Telegram Bot is running on Render!"
+    return "✅ FazzyBot is running on Render!"
 
 # === Bot Logic ===
 user_usage = {}
@@ -69,7 +69,7 @@ async def fetch_json(url):
 @dp.message(Command("start"))
 async def start_handler(msg: Message):
     await msg.reply(
-        "👋 Welcome to the Fuzzy Amaya Like Bot!\n\n"
+        "👋 Welcome to FazzyBot!\n\n"
         "Use /like <region> <uid> to send likes.\n"
         "Example:\n/like bd 123456789",
         reply_markup=join_keyboard()
@@ -126,7 +126,7 @@ async def like_handler(msg: Message):
         f"🆔 UID: {uid}\n"
         f"❤️ Before Likes: {data.get('LikesbeforeCommand', 'N/A')}\n"
         f"👍 Current Likes: {data.get('LikesafterCommand', 'N/A')}\n"
-        f"🎯 Likes Sent By JEX AI: {data.get('LikesGivenByAPI', 'N/A')}",
+        f"🎯 Likes Sent By FazzyBot: {data.get('LikesGivenByAPI', 'N/A')}",
         reply_markup=join_keyboard()
     )
 
@@ -134,12 +134,18 @@ async def like_handler(msg: Message):
         user_usage.setdefault(user_id, {})["like"] = 1
         like_usage[region] += 1
 
-# === Async Run (bot + web) ===
-async def main():
+async def run_bot():
+    print("🤖 FazzyBot is running...")
     asyncio.create_task(daily_reset_scheduler())
-    asyncio.create_task(dp.start_polling(bot))
-    # Keep Flask running (in a thread)
-    Thread(target=lambda: app.run(host="0.0.0.0", port=10000)).start()
+    await dp.start_polling(bot)
 
+# === Run Flask + Bot Together ===
 if __name__ == "__main__":
-    asyncio.run(main())
+    def start_flask():
+        app.run(host="0.0.0.0", port=10000)
+
+    def start_bot():
+        asyncio.run(run_bot())
+
+    threading.Thread(target=start_flask, daemon=True).start()
+    start_bot()
