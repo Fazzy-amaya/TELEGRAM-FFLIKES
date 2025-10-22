@@ -10,7 +10,7 @@ from flask import Flask
 import threading
 
 # === Telegram Bot Setup ===
-API_TOKEN = "8321209822:AAFQZ_tzIW2jJe2eUDkpuz-JIUjXAr4mZLc"
+API_TOKEN = "8321209822:AAG3ryvGXpWXMYemRnn6o8yifwTXXDcFjns"
 ALLOWED_GROUP_ID = -100290233316
 VIP_USER_ID = 7431583417
 
