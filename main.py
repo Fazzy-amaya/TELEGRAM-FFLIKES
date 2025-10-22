@@ -1,63 +1,151 @@
 import asyncio
+import aiohttp
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
-from aiogram.types import Message, Update
+from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.filters import Command
 from aiogram.client.default import DefaultBotProperties
-from flask import Flask, request
+from datetime import datetime, timedelta
+from flask import Flask
+import threading
 
-API_TOKEN = "8321209822:AAG3ryvGXpWXMYemRnn6o8yifwTXXDcFjns"
-WEBHOOK_URL = "https://telegram-fflikes.onrender.com/webhook"
+# === Telegram Bot Setup ===
+API_TOKEN = "8321209822:AAFQZ_tzIW2jJe2eUDkpuz-JIUjXAr4mZLc"
+ALLOWED_GROUP_ID = -100290233316
+VIP_USER_ID = 7431583417
 
 bot = Bot(API_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
+
+# === Flask app for Render (keeps service alive) ===
 app = Flask(__name__)
 
-@dp.message(Command("start"))
-async def start_handler(message: Message):
-    await message.answer("👋 Welcome to FazzyBot!\nUse /help to see commands.")
+@app.route('/')
+def home():
+    print("✅ Health check received")
+    return "✅ FazzyBot is running on Render!"
 
-@dp.message(Command("help"))
-async def help_handler(message: Message):
-    await message.answer("🛠️ Commands:\n/start - Start\n/help - Help\n/like bd <number>")
+# === Bot Logic ===
+user_usage = {}
+like_usage = {"BD": 0, "IND": 0}
+
+def join_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📢 Join Channel", url="https://t.me/FAZZYAMAYA")],
+    ])
+
+def vip_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📢 Join Channel", url="https://t.me/FAZZYAMAYA")],
+        [InlineKeyboardButton(text="💎 Buy VIP", url="https://t.me/FAZZYAMAYA")],
+    ])
+
+def verify_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Verify For Extra Likes", url="https://shortxlinks.in/RTubx")],
+    ])
+
+def reset_daily_limits():
+    user_usage.clear()
+    like_usage["BD"] = 0
+    like_usage["IND"] = 0
+    print("✅ Daily limits reset.")
+
+async def daily_reset_scheduler():
+    while True:
+        now = datetime.now()
+        next_reset = datetime.combine(now.date() + timedelta(days=1), datetime.min.time())
+        wait_seconds = (next_reset - now).total_seconds()
+        await asyncio.sleep(wait_seconds)
+        reset_daily_limits()
+
+async def fetch_json(url):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as r:
+            if r.status == 200:
+                return await r.json()
+    return None
+
+@dp.message(Command("start"))
+async def start_handler(msg: Message):
+    await msg.reply(
+        "👋 Welcome to FazzyBot!\n\n"
+        "Use /like <region> <uid> to send likes.\n"
+        "Example:\n/like bd 123456789",
+        reply_markup=join_keyboard()
+    )
 
 @dp.message(Command("like"))
-async def like_handler(message: Message):
-    text = message.text.strip()
-    if text.startswith("/like bd "):
-        bd_value = text.replace("/like bd ", "").strip()
-        if bd_value.isdigit():
-            await message.answer(f"👍 BD {bd_value} liked!")
-        else:
-            await message.answer("❌ Invalid BD number.")
-    else:
-        await message.answer("❓ Use /like bd <number>")
+async def like_handler(msg: Message):
+    parts = msg.text.split()
+    if len(parts) != 3:
+        await msg.reply("❗ Correct format: /like bd uid", reply_markup=join_keyboard())
+        return
 
-@app.route("/", methods=["GET"])
-def home():
-    return "✅ FazzyBot is alive!"
+    region, uid = parts[1].upper(), parts[2]
+    if region not in ["BD", "IND"]:
+        await msg.reply("❗ Only BD or IND regions are supported!", reply_markup=join_keyboard())
+        return
 
-@app.route("/webhook", methods=["POST"])
-def telegram_webhook():
-    try:
-        data = request.get_data().decode("utf-8")
-        update = Update.model_validate_json(data)
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.create_task(dp.feed_update(bot, update))
-    except Exception as e:
-        print(f"Webhook error: {e}")
-    return "OK"
+    user_id = msg.from_user.id
+    if user_id != VIP_USER_ID:
+        count = user_usage.get(user_id, {}).get("like", 0)
+        if count >= 1:
+            await msg.reply("🚫 You have already used your like command today!", reply_markup=verify_keyboard())
+            return
 
-async def setup_webhook():
-    await bot.set_webhook(WEBHOOK_URL)
-    print("✅ Webhook registered.")
+    if like_usage[region] >= 30 and user_id != VIP_USER_ID:
+        await msg.reply(
+            f"⚠️ Daily like limit reached for {region} region. Please try again tomorrow.",
+            reply_markup=join_keyboard()
+        )
+        return
 
-def run_webhook():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(setup_webhook())
+    wait = await msg.reply("⏳ Sending Likes, Please Wait.....")
+    url = f"https://fazzyamaya.onrender.com/like/like?server_name={region.lower()}&uid={uid}&key=DANGERxGAMER"
+    data = await fetch_json(url)
 
+    if not data:
+        await wait.edit_text("❌ Failed to send request. Check UID or try later.", reply_markup=join_keyboard())
+        return
+
+    if data.get("status") == 2:
+        await wait.edit_text(
+            f"🚫 Max Likes Reached for Today\n\n"
+            f"👤 Name: {data.get('PlayerNickname', 'N/A')}\n"
+            f"🆔 UID: {uid}\n"
+            f"🌍 Region: {region}\n"
+            f"❤️ Current Likes: {data.get('LikesNow', 'N/A')}",
+            reply_markup=vip_keyboard()
+        )
+        return
+
+    await wait.edit_text(
+        f"✅ Likes Sent Successfully!\n\n"
+        f"👤 Name: {data.get('PlayerNickname', 'N/A')}\n"
+        f"🆔 UID: {uid}\n"
+        f"❤️ Before Likes: {data.get('LikesbeforeCommand', 'N/A')}\n"
+        f"👍 Current Likes: {data.get('LikesafterCommand', 'N/A')}\n"
+        f"🎯 Likes Sent By FazzyBot: {data.get('LikesGivenByAPI', 'N/A')}",
+        reply_markup=join_keyboard()
+    )
+
+    if user_id != VIP_USER_ID:
+        user_usage.setdefault(user_id, {})["like"] = 1
+        like_usage[region] += 1
+
+async def run_bot():
+    print("🤖 FazzyBot is running...")
+    asyncio.create_task(daily_reset_scheduler())
+    await dp.start_polling(bot)
+
+# === Run Flask + Bot Together ===
 if __name__ == "__main__":
-    run_webhook()
-    app.run(host="0.0.0.0", port=10000)
+    def start_flask():
+        app.run(host="0.0.0.0", port=10000)
+
+    def start_bot():
+        asyncio.run(run_bot())
+
+    threading.Thread(target=start_flask, daemon=True).start()
+    start_bot()
